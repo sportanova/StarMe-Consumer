@@ -12,4 +12,5 @@ main = do
   rabbit <- initRabbit pool
   forever delay
 
+delay :: IO ()
 delay = threadDelay 1000000000
