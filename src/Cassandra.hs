@@ -43,6 +43,7 @@ findUser pool username = runCas pool $ (findUser' username) >>= (\user -> return
 convertToUser :: Maybe (T.Text, Int, T.Text, T.Text, T.Text, T.Text) -> Maybe M.User
 convertToUser (Just (username, id, url, name, accessToken, password)) = Just user
   where user = M.User {M.username = username, M.id = id, M.url = url, M.name = name, M.token = accessToken, M.password = password}
+convertToUser Nothing = Nothing
 
 createEventsTable :: Query Schema () ()
 createEventsTable = "CREATE TABLE IF NOT EXISTS events (name text, ts int, data1 text, data2 text, PRIMARY KEY(name, ts))"
