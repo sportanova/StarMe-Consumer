@@ -17,6 +17,7 @@ executable starme-consumer
                      , http-conduit ==2.1.5
                      , network
                      , amqp ==0.10.1
+                     , split ==0.2.2
                      , text
                      , aeson
                      , bytestring

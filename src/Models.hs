@@ -42,7 +42,7 @@ data User = User {
                    name :: T.Text,
                    token :: T.Text,
                    password :: T.Text
-                 }
+                 } deriving (Show)
 
 convertBodyToJSON :: L.ByteString -> Maybe [Repo]
 convertBodyToJSON body = do
