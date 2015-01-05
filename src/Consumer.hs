@@ -48,38 +48,35 @@ starCB oldStarPush pool ts (msg, env) = do
   forkIO $ starRepos oldStarPush pool ts msg
   ackEnv env
 
-createStarFns :: T.Text -> [Event] -> [Repo] -> IO (Maybe [IO String])
-createStarFns _ [] _ = return Nothing
-createStarFns uname users repos = do
-  accessTokens <- return $ map (\user -> data2 user) users
-  starRepoFns <- return $ map (\repo -> starRepo uname (rname repo)) repos
-  return $ Just $ starRepoFns <*> accessTokens
+createStarFns :: T.Text -> [Event] -> [Repo] -> Maybe [IO String]
+createStarFns _ [] _ = Nothing
+createStarFns uname users repos =
+  let accessTokens = map (\user -> data2 user) users
+      starRepoFns = map (\repo -> starRepo uname (rname repo)) repos
+  in Just $ starRepoFns <*> accessTokens
 
-starRepos'' :: Pool -> User -> [Event] -> IO ()
-starRepos'' pool user users = do
-  putStrLn $ "received message: " ++ T.unpack (username user)
-  repos <- findRepos pool (username user, False)
-  starRepoFns <- createStarFns (username user) users repos
-  let fns = case starRepoFns of Nothing -> [return ""]
-                                Just xs -> xs
-                                _ -> [return ""]
-  sequence_ fns
+starRepos'' :: User -> [Event] -> [Repo] -> IO ()
+starRepos'' user users repos =
+  case createStarFns (username user) users repos of Just fns -> sequence_ fns
+                                                    Nothing -> return ()
 
 lastTS :: [Event] -> Int
 lastTS = ts . last
 
-starRepos' :: OldStarPush -> Pool -> Int -> T.Text -> Maybe User -> IO ()
-starRepos' oldStarPush pool ts uname (Just user) = do
+starRepos' :: OldStarPush -> Pool -> Int -> T.Text -> Maybe User -> [Repo] -> IO ()
+starRepos' oldStarPush pool ts uname (Just user) repos = do
   users <- findEvents pool ("user", ts)
   putStrLn $ "here " ++ (show user)
   case users of [] -> return ()
-                xs -> {- starOldRepos oldStarPush () >> -} (starRepos'' pool user xs) >> starRepos' oldStarPush pool (lastTS xs) uname (Just user)
-starRepos' oldStarPush pool ts msg Nothing = return ()
+                xs -> {- starOldRepos oldStarPush () >> -} (starRepos'' user xs repos) >> starRepos' oldStarPush pool (lastTS xs) uname (Just user) repos
+starRepos' _ _ _ _ Nothing _= return ()
 
 starRepos oldStarPush pool ts msg = do
   uname <- return $ T.pack $ BL.unpack $ msgBody msg
   user <- findUser pool uname
-  starRepos' oldStarPush pool ts uname user
+  repos <- case user of Just u -> findRepos pool (username u, False)
+                        Nothing -> return []
+  starRepos' oldStarPush pool ts uname user repos
 
 starOldRepos :: OldStarPush -> User -> [Event] -> IO ()
 starOldRepos oldStarPush user users = do
