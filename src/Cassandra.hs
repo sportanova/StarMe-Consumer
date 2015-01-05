@@ -92,3 +92,10 @@ findRepos' tuple = executeRows ONE q tuple
 
 findRepos :: Pool -> (T.Text, Bool) -> IO ([M.Repo])
 findRepos pool tuple = runCas pool $ fmap (\tup -> map convertToRepo tup) (findRepos' tuple)
+
+findRepos1' :: (MonadCassandra m) => T.Text -> m ([(T.Text, Bool, T.Text)])
+findRepos1' tuple = executeRows ONE q tuple
+  where q = "SELECT username, starred, name FROM repos WHERE username=? LIMIT 50"
+
+findRepos1 :: Pool -> T.Text -> IO ([M.Repo])
+findRepos1 pool tuple = runCas pool $ fmap (\tup -> map convertToRepo tup) (findRepos1' tuple)

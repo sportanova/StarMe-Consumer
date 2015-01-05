@@ -38,7 +38,9 @@ pushMessage chan exchange key msg = publishMsg chan exchange key newMsg { msgBod
 
 starOldReposCB :: Pool -> Int -> (Message, Envelope) -> IO ()
 starOldReposCB pool ts (msg, env) = do
-  putStrLn $ "OLD MESSAGE: " ++ head (splitOn ":" (BL.unpack $ msgBody msg))
+  -- putStrLn $ "OLD MESSAGE: " ++ head (splitOn ":" (BL.unpack $ msgBody msg))
+  putStrLn $ "OLD MESSAGE: " ++ (BL.unpack $ msgBody msg)
+  starOldRepos pool (BL.unpack $ msgBody msg)
   ackEnv env
 
 type OldStarPush = String -> IO ()
@@ -68,9 +70,10 @@ starRepos' oldStarPush pool ts uname (Just user) repos = do
   users <- findEvents pool ("user", ts)
   putStrLn $ "here " ++ (show user)
   case users of [] -> return ()
-                xs -> {- starOldRepos oldStarPush () >> -} (starRepos'' user xs repos) >> starRepos' oldStarPush pool (lastTS xs) uname (Just user) repos
+                xs -> sendOldReposToQueue oldStarPush user users >> (starRepos'' user xs repos) >> starRepos' oldStarPush pool (lastTS xs) uname (Just user) repos
 starRepos' _ _ _ _ Nothing _= return ()
 
+starRepos :: OldStarPush -> Pool -> Int -> Message -> IO ()
 starRepos oldStarPush pool ts msg = do
   uname <- return $ T.pack $ BL.unpack $ msgBody msg
   user <- findUser pool uname
@@ -78,19 +81,15 @@ starRepos oldStarPush pool ts msg = do
                         Nothing -> return []
   starRepos' oldStarPush pool ts uname user repos
 
-starOldRepos :: OldStarPush -> User -> [Event] -> IO ()
-starOldRepos oldStarPush user users = do
-  userIds <- sequence $ map (\u -> oldStarPush $ T.unpack (data1 u)) users
-  --repos' <- sequence $ map (\user -> findRepos pool (data1 user, False)) users
-  --repos <- return $ concat repos'
-  return ()
+sendOldReposToQueue :: OldStarPush -> User -> [Event] -> IO () -- send to queue for new user to star all old users' repos
+sendOldReposToQueue oldStarPush user users = sequence_ $ map (\u -> oldStarPush $ T.unpack (data1 u) ++ ":" ++ T.unpack (token user)) users -- userId:accessToken
 
-{- starOldRepos :: Pool -> T.Text -> [Event] -> IO ()
-starOldRepos pool token users = do
-  repos' <- sequence $ map (\user -> findRepos pool (data1 user, False)) users
-  repos <- return $ concat repos'
-  return ()
-  -}
+starOldRepos :: Pool -> String -> IO ()
+starOldRepos pool userIdAndToken = do
+  username:token <- return $ splitOn ":" userIdAndToken
+  accessToken <- return (T.pack $ concat token)
+  repos <- findRepos1 pool (T.pack username)
+  mapM_ (\repo -> starRepo (rusername repo) (rname repo) accessToken) repos
     
   
   
